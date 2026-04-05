@@ -3,24 +3,53 @@
 namespace Mpge\GovelMonitor\Http\Controllers;
 
 use Mpge\GovelMonitor\Models\TaskExecution;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 
 class MonitorController extends Controller
 {
-    public function dashboard()
+    /**
+     * Serve the SPA shell.
+     */
+    public function index()
     {
-        $stats = $this->getStats();
-        $recentTasks = TaskExecution::latest('executed_at')->limit(25)->get();
-        $taskNames = TaskExecution::select('task')
-            ->distinct()
-            ->orderBy('task')
-            ->pluck('task');
-
-        return view('govel-monitor::dashboard', compact('stats', 'recentTasks', 'taskNames'));
+        return view('govel-monitor::app', [
+            'monitorPath' => config('govel-monitor.path', 'govel-monitor'),
+        ]);
     }
 
-    public function tasks(Request $request)
+    /**
+     * GET /api/stats — dashboard stats.
+     */
+    public function stats(): JsonResponse
+    {
+        $last24h = TaskExecution::recent(24);
+        $last1h = TaskExecution::recent(1);
+
+        return response()->json([
+            'total_24h' => (clone $last24h)->count(),
+            'success_24h' => (clone $last24h)->successful()->count(),
+            'failed_24h' => (clone $last24h)->failed()->count(),
+            'pending_24h' => (clone $last24h)->pending()->count(),
+            'avg_duration_24h' => round((clone $last24h)->successful()->avg('duration') ?? 0, 2),
+            'p95_duration_24h' => $this->percentile((clone $last24h)->successful(), 95),
+            'total_1h' => (clone $last1h)->count(),
+            'success_1h' => (clone $last1h)->successful()->count(),
+            'failed_1h' => (clone $last1h)->failed()->count(),
+            'tasks_by_name' => TaskExecution::recent(24)
+                ->selectRaw('task, count(*) as total, sum(case when success = 1 then 1 else 0 end) as succeeded, avg(duration) as avg_duration')
+                ->groupBy('task')
+                ->orderByDesc('total')
+                ->limit(20)
+                ->get(),
+        ]);
+    }
+
+    /**
+     * GET /api/executions — paginated execution list.
+     */
+    public function executions(Request $request): JsonResponse
     {
         $query = TaskExecution::latest('executed_at');
 
@@ -41,55 +70,37 @@ class MonitorController extends Controller
             $query->forDriver($request->input('driver'));
         }
 
-        $executions = $query->paginate(50);
-
-        return view('govel-monitor::tasks', compact('executions'));
+        return response()->json($query->paginate($request->input('per_page', 50)));
     }
 
-    public function show(int $id)
+    /**
+     * GET /api/executions/{id} — single execution detail.
+     */
+    public function show(int $id): JsonResponse
     {
-        $execution = TaskExecution::findOrFail($id);
-
-        return view('govel-monitor::task-detail', compact('execution'));
+        return response()->json(TaskExecution::findOrFail($id));
     }
 
-    public function stats()
+    /**
+     * GET /api/filters — available filter options.
+     */
+    public function filters(): JsonResponse
     {
-        return response()->json($this->getStats());
+        return response()->json([
+            'tasks' => TaskExecution::select('task')->distinct()->orderBy('task')->pluck('task'),
+            'drivers' => TaskExecution::select('driver')->distinct()->orderBy('driver')->pluck('driver'),
+        ]);
     }
 
-    public function purge()
+    /**
+     * DELETE /api/purge — remove old records.
+     */
+    public function purge(): JsonResponse
     {
         $hours = config('govel-monitor.retention', 168);
-
         $deleted = TaskExecution::where('executed_at', '<', now()->subHours($hours))->delete();
 
-        return back()->with('message', "Purged {$deleted} records.");
-    }
-
-    protected function getStats(): array
-    {
-        $last24h = TaskExecution::recent(24);
-        $last1h = TaskExecution::recent(1);
-
-        return [
-            'total_24h' => (clone $last24h)->count(),
-            'success_24h' => (clone $last24h)->successful()->count(),
-            'failed_24h' => (clone $last24h)->failed()->count(),
-            'pending_24h' => (clone $last24h)->pending()->count(),
-            'avg_duration_24h' => round((clone $last24h)->successful()->avg('duration') ?? 0, 2),
-            'p95_duration_24h' => $this->percentile((clone $last24h)->successful(), 95),
-            'total_1h' => (clone $last1h)->count(),
-            'success_1h' => (clone $last1h)->successful()->count(),
-            'failed_1h' => (clone $last1h)->failed()->count(),
-            'tasks_by_name' => TaskExecution::recent(24)
-                ->selectRaw('task, count(*) as total, sum(case when success = 1 then 1 else 0 end) as succeeded, avg(duration) as avg_duration')
-                ->groupBy('task')
-                ->orderByDesc('total')
-                ->limit(20)
-                ->get()
-                ->toArray(),
-        ];
+        return response()->json(['deleted' => $deleted]);
     }
 
     protected function percentile($query, int $percentile): float

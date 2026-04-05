@@ -2,8 +2,14 @@
 
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', 'MonitorController@dashboard')->name('govel-monitor.dashboard');
-Route::get('/tasks', 'MonitorController@tasks')->name('govel-monitor.tasks');
-Route::get('/tasks/{id}', 'MonitorController@show')->name('govel-monitor.task.show');
+// API routes
 Route::get('/api/stats', 'MonitorController@stats')->name('govel-monitor.api.stats');
-Route::delete('/purge', 'MonitorController@purge')->name('govel-monitor.purge');
+Route::get('/api/executions', 'MonitorController@executions')->name('govel-monitor.api.executions');
+Route::get('/api/executions/{id}', 'MonitorController@show')->name('govel-monitor.api.show');
+Route::get('/api/filters', 'MonitorController@filters')->name('govel-monitor.api.filters');
+Route::delete('/api/purge', 'MonitorController@purge')->name('govel-monitor.api.purge');
+
+// SPA catch-all (must be last)
+Route::get('/{any?}', 'MonitorController@index')
+    ->where('any', '.*')
+    ->name('govel-monitor.dashboard');

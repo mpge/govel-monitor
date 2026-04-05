@@ -1,8 +1,6 @@
 <p align="center">
-    <img src="https://raw.githubusercontent.com/mpge/govel/main/art/logo.png" width="400" alt="Govel">
+    <img src="art/logo.png" width="500" alt="Govel Monitor — real-time task monitoring dashboard">
 </p>
-
-<h1 align="center">Govel Monitor</h1>
 
 <p align="center">
     <a href="https://packagist.org/packages/mpge/govel-monitor"><img src="https://img.shields.io/packagist/v/mpge/govel-monitor.svg?style=flat-square" alt="Latest Version on Packagist"></a>
