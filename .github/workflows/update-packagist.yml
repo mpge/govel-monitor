@@ -1,0 +1,19 @@
+name: Update Packagist
+
+on:
+  push:
+    branches: [main]
+    tags: ['*']
+
+jobs:
+  packagist:
+    runs-on: ubuntu-latest
+    name: Notify Packagist
+
+    steps:
+      - name: Ping Packagist
+        run: |
+          curl -XPOST \
+            -H 'content-type: application/json' \
+            "https://packagist.org/api/update-package?username=${{ secrets.PACKAGIST_USERNAME }}&apiToken=${{ secrets.PACKAGIST_TOKEN }}" \
+            -d '{"repository":{"url":"https://github.com/mpge/govel-monitor"}}'
