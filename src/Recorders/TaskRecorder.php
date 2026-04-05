@@ -18,9 +18,9 @@ class TaskRecorder
             'task' => $task,
             'driver' => $driver,
             'mode' => $mode,
-            'payload' => $payload,
+            'payload' => $this->redact($payload),
             'success' => $result->success,
-            'output' => $result->output,
+            'output' => is_array($result->output) ? $this->redact($result->output) : $result->output,
             'error' => $result->error,
             'duration' => $result->duration,
             'executed_at' => now(),
@@ -37,12 +37,29 @@ class TaskRecorder
             'task' => $task,
             'driver' => $driver,
             'mode' => $mode,
-            'payload' => $payload,
+            'payload' => $this->redact($payload),
             'success' => null,
             'output' => null,
             'error' => null,
             'duration' => null,
             'executed_at' => now(),
         ]);
+    }
+
+    private function redact(array $data): array
+    {
+        $keys = config('govel-monitor.redact_keys', [
+            'password', 'token', 'secret', 'api_key', 'authorization',
+        ]);
+
+        foreach ($data as $key => $value) {
+            if (is_string($key) && in_array(strtolower($key), array_map('strtolower', $keys), true)) {
+                $data[$key] = '********';
+            } elseif (is_array($value)) {
+                $data[$key] = $this->redact($value);
+            }
+        }
+
+        return $data;
     }
 }

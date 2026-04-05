@@ -73,4 +73,16 @@ return [
 
     'gate' => null, // Closure or null (defaults to local-only)
 
+    /*
+    |--------------------------------------------------------------------------
+    | Payload Redaction
+    |--------------------------------------------------------------------------
+    |
+    | Keys that should be redacted from recorded payloads and outputs.
+    | Values matching these keys will be replaced with '********'.
+    |
+    */
+
+    'redact_keys' => ['password', 'token', 'secret', 'api_key', 'authorization'],
+
 ];

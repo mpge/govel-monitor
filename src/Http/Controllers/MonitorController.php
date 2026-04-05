@@ -6,6 +6,7 @@ use Mpge\GovelMonitor\Models\TaskExecution;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Log;
 
 class MonitorController extends Controller
 {
@@ -14,9 +15,13 @@ class MonitorController extends Controller
      */
     public function index()
     {
-        return view('govel-monitor::app', [
-            'monitorPath' => config('govel-monitor.path', 'govel-monitor'),
-        ]);
+        return response()
+            ->view('govel-monitor::app', [
+                'monitorPath' => config('govel-monitor.path', 'govel-monitor'),
+            ])
+            ->header('X-Frame-Options', 'DENY')
+            ->header('X-Content-Type-Options', 'nosniff')
+            ->header('Referrer-Policy', 'no-referrer');
     }
 
     /**
@@ -70,7 +75,9 @@ class MonitorController extends Controller
             $query->forDriver($request->input('driver'));
         }
 
-        return response()->json($query->paginate($request->input('per_page', 50)));
+        $perPage = max(1, min(100, (int) $request->input('per_page', 50)));
+
+        return response()->json($query->paginate($perPage));
     }
 
     /**
@@ -100,21 +107,21 @@ class MonitorController extends Controller
         $hours = config('govel-monitor.retention', 168);
         $deleted = TaskExecution::where('executed_at', '<', now()->subHours($hours))->delete();
 
+        Log::info('Govel Monitor purge executed.', [
+            'deleted' => $deleted,
+            'ip' => request()->ip(),
+        ]);
+
         return response()->json(['deleted' => $deleted]);
     }
 
     protected function percentile($query, int $percentile): float
     {
-        $values = $query->whereNotNull('duration')
-            ->orderBy('duration')
-            ->pluck('duration');
-
-        if ($values->isEmpty()) {
-            return 0;
-        }
-
-        $index = (int) ceil(($percentile / 100) * $values->count()) - 1;
-
-        return round($values->get(max(0, $index)) ?? 0, 2);
+        $count = $query->whereNotNull('duration')->count();
+        if ($count === 0) return 0;
+        $offset = (int) ceil(($percentile / 100) * $count) - 1;
+        $value = (clone $query)->whereNotNull('duration')
+            ->orderBy('duration')->offset(max(0, $offset))->limit(1)->value('duration');
+        return round($value ?? 0, 2);
     }
 }

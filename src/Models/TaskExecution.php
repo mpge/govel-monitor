@@ -9,7 +9,17 @@ class TaskExecution extends Model
 {
     public $timestamps = true;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'task',
+        'driver',
+        'mode',
+        'payload',
+        'success',
+        'output',
+        'error',
+        'duration',
+        'executed_at',
+    ];
 
     protected function casts(): array
     {
